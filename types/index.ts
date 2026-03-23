@@ -5,8 +5,8 @@ export type BundleAsset = {
   name: string;
   symbol: string;
   decimals: number;
-  startWeight: number;
-  endWeight: number;
+  startWeight: bigint;
+  endWeight: bigint;
   balance: bigint;
 };
 

@@ -1,7 +1,5 @@
 import { View, type ViewProps } from "react-native";
 
-import { uiTokens } from "@/lib/ui-tokens";
-
 /** Explore / index list row: `bg-white border border-gray-200 rounded-md px-4 py-3` (light). */
 export function BundlesCard({
   className,

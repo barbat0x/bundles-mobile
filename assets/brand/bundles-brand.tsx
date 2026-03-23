@@ -1,6 +1,6 @@
 /**
- * Logos bundles.fi — importés depuis bundles-frontend `public/assets/img/logo` (+ favicon).
- * Usage : <BundlesLogo width={180} height={37} /> (props react-native-svg)
+ * bundles.fi logos imported from bundles-frontend `public/assets/img/logo` (+ favicon).
+ * Usage: <BundlesLogo width={180} height={37} /> (react-native-svg props)
  */
 import type { SvgProps } from "react-native-svg";
 
@@ -21,7 +21,7 @@ export function BundlesFavicon(props: SvgProps) {
 }
 
 /**
- * Barre d’app : même graphisme que le favicon (un seul fichier `favicon.svg`, pas de copie).
+ * App bar icon uses the same favicon artwork (single `favicon.svg` source).
  */
 export function BundlesAppIcon(props: SvgProps) {
   return <FaviconSvg {...props} />;

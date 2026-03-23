@@ -1,5 +1,6 @@
 /**
- * Icônes de chaîne — mêmes fichiers que bundles-frontend `public/assets/img/chains/*.svg`.
+ * Chain icons from the same source files used by bundles-frontend:
+ * `public/assets/img/chains/*.svg`.
  */
 import type { ComponentType } from "react";
 import type { SvgProps } from "react-native-svg";

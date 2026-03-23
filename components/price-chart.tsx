@@ -5,6 +5,7 @@ import Svg, { Polyline } from "react-native-svg";
 import { BundlesSegmented } from "@/components/ui";
 import type { HistoryTimeframe } from "@/services/bundles-ws/token-api";
 import { uiTokens } from "@/lib/ui-tokens";
+import { t } from "@/lib/i18n";
 import { formatUsd } from "@/lib/format";
 
 import type { PricePoint } from "@/types";
@@ -64,7 +65,7 @@ export function PriceChart({ data, loading, timeframe, onChangeTimeframe }: Pric
             <Polyline points={pts} fill="none" stroke={uiTokens.colors.chartLine} strokeWidth="2" />
           </Svg>
         ) : (
-          <Text className="text-bundle-muted">Pas assez de données</Text>
+          <Text className="text-bundle-muted">{t("chart.notEnoughData")}</Text>
         )}
       </View>
       {last !== undefined ? (

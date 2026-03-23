@@ -1,4 +1,4 @@
-/** PLAN §10.3 — contrat PurchaseIntent (persisté AsyncStorage côté app). */
+/** PLAN §10.3 - PurchaseIntent JSON contract persisted in AsyncStorage. */
 describe("PurchaseIntent JSON contract", () => {
   type Intent = {
     id: string;

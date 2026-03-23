@@ -38,8 +38,8 @@ export function graphIndexToBundle(raw: RawIndex): BundleIndex {
     name: a.token.name,
     symbol: a.token.symbol,
     decimals: Number(a.token.decimals),
-    startWeight: Number(a.startWeight),
-    endWeight: Number(a.endWeight),
+    startWeight: parseBigIntStr(a.startWeight),
+    endWeight: parseBigIntStr(a.endWeight),
     balance: parseBigIntStr(a.balance),
   }));
 

@@ -4,10 +4,10 @@ import { getAddress, type Address } from "viem";
 import { DEFAULT_CHAIN_ID, type SupportedChainId } from "@/lib/chains";
 
 /**
- * Même source que bundles-frontend `Token.getIconUrl()` :
+ * Same source as bundles-frontend `Token.getIconUrl()`:
  * `${mediaServerEndpoint}/tokens/${chainId}/${address}.svg`
  *
- * Les fichiers ne sont pas dans le repo : CDN `media.bundles.fi`.
+ * Assets are not stored in this repo; they are served from `media.bundles.fi`.
  */
 export function getMediaOrigin(): string {
   return (
@@ -19,7 +19,7 @@ export function getMediaOrigin(): string {
 }
 
 /**
- * Icône ERC-20 (SVG sur le CDN), checksum EIP-55 comme le web.
+ * ERC-20 icon (SVG on CDN), EIP-55 checksummed address like web app.
  */
 export function getErc20TokenIconUrl(chainId: number, tokenAddress: Address | string): string {
   const origin = getMediaOrigin();
@@ -35,7 +35,7 @@ function getUploadsBase(): string {
 }
 
 /**
- * PLAN §6.7.4 — icône index / bundle (PNG), aligné `IndexToken.getIconUrl()` :
+ * PLAN §6.7.4 - index / bundle icon (PNG), aligned with `IndexToken.getIconUrl()`:
  * `{uploads}/indexes/{chainId}/icons/{address}.png`
  */
 export function bundleIconUrl(indexAddress: string, chainId: SupportedChainId = DEFAULT_CHAIN_ID): string {

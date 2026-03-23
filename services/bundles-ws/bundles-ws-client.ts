@@ -1,4 +1,5 @@
 import { getEnv } from "@/lib/env";
+import { t } from "@/lib/i18n";
 
 import type { WsRequest, WsResponse } from "./types";
 
@@ -35,7 +36,7 @@ export class BundlesWsClient {
         };
         ws.onerror = () => {
           this.openPromise = null;
-          reject(new Error("WebSocket connection failed"));
+          reject(new Error(t("errors.wsConnectionFailed")));
         };
         ws.onclose = (ev) => {
           if (ev.code !== 1000) {
@@ -57,7 +58,7 @@ export class BundlesWsClient {
           if (!p) return;
           this.pending.delete(msg.id);
           if (msg.error) {
-            p.reject(new Error("WS server error"));
+            p.reject(new Error(t("errors.wsServerError")));
           } else {
             p.resolve(msg.data);
           }
@@ -76,7 +77,7 @@ export class BundlesWsClient {
     const payload: WsRequest = { id, route, data };
     const ws = this.socket;
     if (!ws || ws.readyState !== WebSocket.OPEN) {
-      throw new Error("WebSocket not connected");
+      throw new Error(t("errors.wsNotConnected"));
     }
     return new Promise<T>((resolve, reject) => {
       this.pending.set(id, {

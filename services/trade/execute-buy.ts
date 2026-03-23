@@ -10,6 +10,7 @@ import type { SupportedChainId } from "@/lib/chains";
 import { getContracts, SLIPPAGE_BPS, TX_DEADLINE_SECONDS } from "@/lib/contracts";
 import { amountMaxAfterSlippageUp, toSlippageBpsBigint } from "@/lib/slippage";
 import { buyBundle } from "@/services/universal-router-client";
+import { t } from "@/lib/i18n";
 
 export type BuyArgs = {
   publicClient: PublicClient;
@@ -31,7 +32,7 @@ export async function executeBuy(a: BuyArgs): Promise<{ transactionHash: string 
   const bps = toSlippageBpsBigint(a.slippageBps, SLIPPAGE_BPS);
   const ethWithSlippage = amountMaxAfterSlippageUp(quote.ethCost, bps);
   if (ethWithSlippage <= quote.ethCost) {
-    throw new Error("Budget ETH avec slippage invalide");
+    throw new Error(t("errors.invalidEthBudgetAfterSlippage"));
   }
   const deadline = BigInt(Math.floor(Date.now() / 1000) + TX_DEADLINE_SECONDS);
 
@@ -59,7 +60,7 @@ export async function executeBuy(a: BuyArgs): Promise<{ transactionHash: string 
   });
 
   if (receipt.status !== "success") {
-    throw new Error("Buy transaction reverted");
+    throw new Error(t("errors.buyTransactionReverted"));
   }
 
   return { transactionHash: submitted.transactionHash };

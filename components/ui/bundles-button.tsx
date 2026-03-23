@@ -20,7 +20,7 @@ export interface BundlesButtonProps extends Omit<PressableProps, "children"> {
 }
 
 const variantClasses: Record<BundlesButtonVariant, string> = {
-  primary: "bg-bundle-cta border border-transparent",
+  primary: "bg-bundle-cta",
   secondary: "bg-bundle-secondary-bg border border-bundle-border",
   transparent: "bg-transparent border border-bundle-border",
   highlight: "bg-bundle-highlight border border-pink-600",
@@ -47,10 +47,16 @@ export function BundlesButton({
   ...rest
 }: BundlesButtonProps) {
   const isDisabled = disabled || loading;
+  const hasFixedHeight = Boolean(className && /(^|\s)h-\S+/.test(className));
+  const disabledStateClass =
+    isDisabled && variant === "primary"
+      ? "bg-[#AA03B6] border-0"
+      : isDisabled
+        ? "opacity-50"
+        : "";
   const base =
-    "rounded-full items-center justify-center flex-row gap-2 active:opacity-90 " +
-    (isDisabled ? "opacity-50" : "");
-  const pad = size === "sm" ? "px-4 py-2" : "px-4 py-3";
+    "rounded-[20px] items-center justify-center flex-row gap-2 active:opacity-90 " + disabledStateClass;
+  const pad = hasFixedHeight ? "px-4" : size === "sm" ? "px-4 py-2" : "px-4 py-3";
   const merged = [base, pad, variantClasses[variant], className].filter(Boolean).join(" ");
 
   const spinnerColor =

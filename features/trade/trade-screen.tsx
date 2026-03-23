@@ -1,20 +1,22 @@
 import { buyBundle, quoteBundles, sellBundle } from "@/services/universal-router-client";
-import { TX_DEADLINE_SECONDS } from "@/lib/contracts";
 import * as WebBrowser from "expo-web-browser";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Modal, Pressable, ScrollView, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import { useActiveAccount } from "thirdweb/react-native";
 
-import { ConnectWalletButton } from "@/components/connect-wallet-button";
 import { parseUnits, type Address } from "viem";
 
-import { AppHeader } from "@/components/app-header";
-import { BundlesButton, BundlesSegmented, BundlesTextInput } from "@/components/ui";
-import { NetworkSwitch } from "@/components/network-switch";
+import { BundlesButton, BundlesTextInput } from "@/components/ui";
+import { WalletMenuHeader } from "@/components/wallet-menu-header";
+import { TopVioletGradient } from "@/components/top-violet-gradient";
 import { getThirdwebChain } from "@/lib/chain-runtime";
 import { formatEthFromWei, formatBundleAmount } from "@/lib/format";
+import { t } from "@/lib/i18n";
+import { bundleIconUrl } from "@/lib/media";
 import { uiTokens } from "@/lib/ui-tokens";
 import { isOnRampEnabledChain } from "@/lib/chains";
 import { isThirdwebPayTestMode } from "@/lib/env";
@@ -51,9 +53,16 @@ import {
   SLIPPAGE_BPS_MIN,
   toSlippageBpsBigint,
 } from "@/lib/slippage";
-import { getModeAGasBufferWei, POST_ONRAMP_RESERVE_USD, SLIPPAGE_BPS } from "@/lib/contracts";
+import {
+  getModeAGasBufferWei,
+  POST_ONRAMP_RESERVE_USD,
+  SLIPPAGE_BPS,
+  TX_DEADLINE_SECONDS,
+} from "@/lib/contracts";
+import { cardShadow, pageVioletBg } from "@/lib/ui-shell";
 
 type ModeBDirection = "buy" | "sell";
+type TradeFundsSource = "cb" | "swap";
 
 function randomId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -63,12 +72,12 @@ export function TradeScreen() {
   const params = useLocalSearchParams<{ bundle?: string }>();
   const account = useActiveAccount();
   const activeChainId = useNetworkStore((s) => s.activeChainId);
-  const qc = useQueryClient();
+  const queryClient = useQueryClient();
   const twChain = getThirdwebChain(activeChainId);
   const onRampEnabled = isOnRampEnabledChain(activeChainId);
   const thirdwebPayTestMode = isThirdwebPayTestMode();
   const client = getThirdwebBrowserClient();
-  const pub = getViemPublicClient(activeChainId);
+  const publicClient = getViemPublicClient(activeChainId);
 
   const { tradeTabMode, setTradeTabMode, slippageBps, setSlippageBps } = useTradeUiStore();
   const bundlesQ = useBundleIndexesList(activeChainId);
@@ -113,19 +122,19 @@ export function TradeScreen() {
     queryKey: ["modeA", "est", activeChainId, selected, debouncedFiatAmount, fiatCurrency],
     queryFn: async () => {
       const fiatNum = Number(debouncedFiatAmount);
-      if (!selected || !Number.isFinite(fiatNum)) throw new Error("invalid");
+      if (!selected || !Number.isFinite(fiatNum)) throw new Error(t("trade.errors.invalidInput"));
       let ethWei: bigint | null = null;
 
       if (account?.address) {
         try {
-          const qFiat = await quoteFiatToEthOnramp({
+          const onRampQuote = await quoteFiatToEthOnramp({
             client,
             chainId: activeChainId,
             walletAddress: account.address,
             fiatAmount: debouncedFiatAmount,
             fiatCurrency,
           });
-          ethWei = BigInt(qFiat.onRampToken.amountWei);
+          ethWei = BigInt(onRampQuote.onRampToken.amountWei);
         } catch {
           // Non-blocking fallback to public price estimation.
         }
@@ -137,8 +146,8 @@ export function TradeScreen() {
         ethWei = BigInt(Math.floor(ethFloat * 1e18));
       }
 
-      const [q] = await quoteBundles(pub, [selected as Address]);
-      const weiPerToken = q.singleTokenValueETH;
+      const [bundleQuote] = await quoteBundles(publicClient, [selected as Address]);
+      const weiPerToken = bundleQuote.singleTokenValueETH;
       const estTokens = weiPerToken > 0n ? Number(ethWei) / Number(weiPerToken) : 0;
       const desiredHuman = estTokens;
       const desiredWei =
@@ -147,10 +156,10 @@ export function TradeScreen() {
           : 0n;
       let ethCost = 0n;
       if (desiredWei > 0n) {
-        const b = await buyBundle(pub, selected as Address, desiredWei, {
+        const buyQuote = await buyBundle(publicClient, selected as Address, desiredWei, {
           deadline: BigInt(TX_DEADLINE_SECONDS),
         });
-        ethCost = b.ethCost;
+        ethCost = buyQuote.ethCost;
       }
       return {
         fiatAmount: fiatNum,
@@ -178,13 +187,13 @@ export function TradeScreen() {
     enabled: tradeTabMode === "swap" && amountWei > 0n && Boolean(selected),
     queryKey: ["modeB", "q", activeChainId, selected, amountWei.toString(), modeBDir],
     queryFn: async () => {
-      if (!selected) throw new Error("no bundle");
+      if (!selected) throw new Error(t("trade.errors.noBundleSelected"));
       if (modeBDir === "buy") {
-        return buyBundle(pub, selected as Address, amountWei, {
+        return buyBundle(publicClient, selected as Address, amountWei, {
           deadline: BigInt(TX_DEADLINE_SECONDS),
         });
       }
-      return sellBundle(pub, selected as Address, amountWei, {
+      return sellBundle(publicClient, selected as Address, amountWei, {
         deadline: BigInt(TX_DEADLINE_SECONDS),
       });
     },
@@ -202,11 +211,11 @@ export function TradeScreen() {
     queryKey: ["modeA", "onramp-status", pendingIntent?.onRampIntentId ?? "none"],
     queryFn: async () => {
       if (!pendingIntent?.onRampIntentId) return "NONE";
-      const s = await fetchBuyWithFiatIntentStatus({
+      const intentStatus = await fetchBuyWithFiatIntentStatus({
         client,
         intentId: pendingIntent.onRampIntentId,
       });
-      return s.status;
+      return intentStatus.status;
     },
     refetchInterval: 5000,
     staleTime: 0,
@@ -231,7 +240,7 @@ export function TradeScreen() {
       if (!account?.address || !pendingIntent) {
         return { ready: false as const, bundleOutWei: 0n };
       }
-      const bal = await pub.getBalance({
+      const walletBalanceWei = await publicClient.getBalance({
         address: account.address as Address,
       });
       const bps = toSlippageBpsBigint(BigInt(clampSlippageBps(slippageBps)), SLIPPAGE_BPS);
@@ -240,19 +249,19 @@ export function TradeScreen() {
       let spendReserveWei = 0n;
       if (activeChainId === 1) {
         try {
-          const px = await fetchEthUsdCoingeckoCached();
-          spendReserveWei = ethWeiFromUsdReserve(POST_ONRAMP_RESERVE_USD, px);
+          const ethUsdPrice = await fetchEthUsdCoingeckoCached();
+          spendReserveWei = ethWeiFromUsdReserve(POST_ONRAMP_RESERVE_USD, ethUsdPrice);
         } catch {
           spendReserveWei = 10n ** 15n;
         }
       }
 
       return computeModeAFundsState({
-        publicClient: pub,
+        publicClient,
         bundleAddress: pendingIntent.bundleAddress as Address,
         targetBundleOutWei: BigInt(pendingIntent.desiredBundleAmount),
         slippageBps: bps,
-        balanceWei: bal,
+        balanceWei: walletBalanceWei,
         gasBufferWei: gasBuffer,
         spendReserveWei,
       });
@@ -263,46 +272,46 @@ export function TradeScreen() {
 
   const swapMutation = useMutation({
     mutationFn: async () => {
-      if (!account || !selected) throw new Error("Wallet ou bundle requis");
+      if (!account || !selected) throw new Error(t("trade.errors.walletAndBundleRequired"));
       if (!isBundleAddressAllowed(selected as Address, bundles)) {
-        throw new Error("Ce token n’est pas un bundle listé");
+        throw new Error(t("trade.errors.bundleNotAllowed"));
       }
-      const b = BigInt(clampSlippageBps(slippageBps));
-      if (amountWei <= 0n) throw new Error("Montant requis");
+      const slippageBpsBigint = BigInt(clampSlippageBps(slippageBps));
+      if (amountWei <= 0n) throw new Error(t("trade.errors.amountRequired"));
       if (modeBDir === "buy") {
         return executeBuy({
-          publicClient: pub,
+          publicClient,
           twClient: client,
           twChain,
           chainId: activeChainId,
           account,
           bundleAddress: selected as Address,
           desiredBundleAmount: amountWei,
-          slippageBps: b,
+          slippageBps: slippageBpsBigint,
         });
       }
       return executeSell({
-        publicClient: pub,
+        publicClient,
         twClient: client,
         twChain,
         chainId: activeChainId,
         account,
         bundleAddress: selected as Address,
         bundleAmountIn: amountWei,
-        slippageBps: b,
+        slippageBps: slippageBpsBigint,
       });
     },
     onSuccess: async () => {
-      await qc.invalidateQueries();
+      await queryClient.invalidateQueries();
       setAmountText("");
     },
   });
 
   const openOnrampMutation = useMutation({
     mutationFn: async () => {
-      if (!account?.address) throw new Error("Connectez un wallet");
-      if (!selected || !modeAEstimate.data?.desiredWei) throw new Error("Quote requise");
-      const qFiat = await quoteFiatToEthOnramp({
+      if (!account?.address) throw new Error(t("trade.errors.connectWallet"));
+      if (!selected || !modeAEstimate.data?.desiredWei) throw new Error(t("trade.errors.quoteRequired"));
+      const onRampQuote = await quoteFiatToEthOnramp({
         client,
         chainId: activeChainId,
         walletAddress: account.address,
@@ -315,60 +324,60 @@ export function TradeScreen() {
         bundleAddress: selected as Address,
         desiredBundleAmount: modeAEstimate.data.desiredWei.toString(),
         expectedEthCost: modeAEstimate.data.ethCost.toString(),
-        onRampIntentId: qFiat.intentId,
+        onRampIntentId: onRampQuote.intentId,
         status: "payment_pending",
         createdAt: Date.now(),
       };
       await savePurchaseIntent(intent);
       setPendingIntent(intent);
-      await WebBrowser.openBrowserAsync(qFiat.onRampLink);
+      await WebBrowser.openBrowserAsync(onRampQuote.onRampLink);
     },
   });
 
   const resumeMutation = useMutation({
     mutationFn: async () => {
       const intent = pendingIntent ?? (await loadPurchaseIntent());
-      if (!intent || !account) throw new Error("Pas d’achat en attente");
+      if (!intent || !account) throw new Error(t("trade.errors.noPendingPurchase"));
       if (intent.chainId !== activeChainId) {
-        throw new Error("Intent one-click créé sur un autre réseau");
+        throw new Error(t("trade.errors.intentWrongNetwork"));
       }
       await savePurchaseIntent({ ...intent, status: "swapping" });
       setPendingIntent({ ...intent, status: "swapping" });
-      const list = await qc.ensureQueryData({
+      const list = await queryClient.ensureQueryData({
         ...queryConfig.bundlesList(activeChainId),
         queryFn: () => fetchBundleIndexesList(activeChainId),
       });
       if (!isBundleAddressAllowed(intent.bundleAddress, list)) {
-        throw new Error("Ce token n’est pas un bundle listé");
+        throw new Error(t("trade.errors.bundleNotAllowed"));
       }
 
-      const bal = await pub.getBalance({ address: account.address as Address });
+      const walletBalanceWei = await publicClient.getBalance({ address: account.address as Address });
       const bps = toSlippageBpsBigint(BigInt(clampSlippageBps(slippageBps)), SLIPPAGE_BPS);
       const gasBuffer = getModeAGasBufferWei(activeChainId);
       let spendReserveWei = 0n;
       if (activeChainId === 1) {
         try {
-          const px = await fetchEthUsdCoingeckoCached();
-          spendReserveWei = ethWeiFromUsdReserve(POST_ONRAMP_RESERVE_USD, px);
+          const ethUsdPrice = await fetchEthUsdCoingeckoCached();
+          spendReserveWei = ethWeiFromUsdReserve(POST_ONRAMP_RESERVE_USD, ethUsdPrice);
         } catch {
           spendReserveWei = 10n ** 15n;
         }
       }
       const { ready, bundleOutWei } = await computeModeAFundsState({
-        publicClient: pub,
+        publicClient,
         bundleAddress: intent.bundleAddress as Address,
         targetBundleOutWei: BigInt(intent.desiredBundleAmount),
         slippageBps: bps,
-        balanceWei: bal,
+        balanceWei: walletBalanceWei,
         gasBufferWei: gasBuffer,
         spendReserveWei,
       });
       if (!ready || bundleOutWei <= 0n) {
-        throw new Error("Solde insuffisant après réserve ETH (~2 $) et gas");
+        throw new Error(t("trade.errors.insufficientBalance"));
       }
 
       await executeBuy({
-        publicClient: pub,
+        publicClient,
         twClient: client,
         twChain,
         chainId: activeChainId,
@@ -379,7 +388,7 @@ export function TradeScreen() {
       });
       await clearPurchaseIntent();
       setPendingIntent(null);
-      await qc.invalidateQueries();
+      await queryClient.invalidateQueries();
     },
     onError: async () => {
       const intent = pendingIntent ?? (await loadPurchaseIntent());
@@ -429,79 +438,120 @@ export function TradeScreen() {
       return;
     }
     if (!onRampEnabled) {
-      throw new Error("On-ramp indisponible sur ce réseau");
+      throw new Error(t("trade.errors.onRampUnavailable"));
     }
     await openOnrampMutation.mutateAsync();
   }, [onRampEnabled, openOnrampMutation, swapMutation, tradeTabMode]);
 
+  const renderFundsSourceTab = useCallback(
+    (
+      value: TradeFundsSource,
+      label: string,
+      iconName: keyof typeof Ionicons.glyphMap,
+    ) => {
+      const selected = tradeTabMode === value;
+      return (
+        <Pressable
+          key={value}
+          onPress={() => {
+            if (value === "cb" && !onRampEnabled) return;
+            setTradeTabMode(value);
+          }}
+          className={`h-full flex-1 flex-row items-center justify-center gap-2 ${selected ? "bg-[#8A0294]" : "bg-white"}`}
+        >
+          <Ionicons name={iconName} size={18} color={selected ? "#FFFFFF" : "#8A0294"} />
+          <Text
+            className={`text-[18px] ${selected ? "text-white" : "text-[#8A0294]"}`}
+            style={{ fontFamily: selected ? uiTokens.fontFamily.sansSemibold : uiTokens.fontFamily.sansMedium }}
+          >
+            {label}
+          </Text>
+        </Pressable>
+      );
+    },
+    [onRampEnabled, setTradeTabMode, tradeTabMode],
+  );
+
+  const renderTradeDirectionTab = useCallback(
+    (value: ModeBDirection, label: string) => {
+      const selected = modeBDir === value;
+      return (
+        <Pressable
+          key={value}
+          onPress={() => setModeBDir(value)}
+          className={`h-10 flex-1 rounded-[12px] items-center justify-center ${selected ? "bg-[#8A0294]" : "bg-transparent"}`}
+        >
+          <Text
+            className={`text-[15px] ${selected ? "text-white" : "text-[#919299]"}`}
+            style={{ fontFamily: selected ? uiTokens.fontFamily.sansMedium : uiTokens.fontFamily.sans }}
+          >
+            {label}
+          </Text>
+        </Pressable>
+      );
+    },
+    [modeBDir],
+  );
+
   return (
-    <View className="flex-1 bg-bundle-bg">
-      <AppHeader right={<ConnectWalletButton />} />
-      <View className="px-4 py-2">
-        <NetworkSwitch />
+    <View className="flex-1" style={{ backgroundColor: pageVioletBg }}>
+      <View className="absolute top-0 left-0 right-0">
+        <TopVioletGradient gradientId="tradeTopVioletFade" />
       </View>
-      <ScrollView contentContainerClassName="p-4 pb-32" keyboardShouldPersistTaps="handled">
+      <View className="px-[14px] pt-[52px]">
+        <WalletMenuHeader />
+      </View>
+      <ScrollView contentContainerClassName="px-[14px] pb-32" keyboardShouldPersistTaps="handled">
         {pendingIntent ? (
           <View className="bg-amber-50 border border-amber-200 rounded-md p-3 mb-4">
             <Text className="text-amber-900 mb-2">
               {pendingIntent.status === "swapping"
-                ? "ETH détecté. Achat bundle en cours..."
+                ? t("trade.pendingSwap")
                 : pendingIntent.status === "payment_pending"
-                  ? "Paiement en cours de confirmation (on-ramp). Le swap se lancera ensuite automatiquement."
+                  ? t("trade.pendingPayment")
                   : pendingIntent.status === "payment_failed"
-                    ? "Le paiement on-ramp a échoué. Réessayez un nouvel achat."
+                    ? t("trade.paymentFailed")
                     : pendingIntent.status === "swap_failed"
-                      ? "Le swap auto a échoué. Aucun retry auto n'est relancé."
-                      : "ETH reçus. Le swap bundle va se lancer automatiquement."}
+                      ? t("trade.swapFailed")
+                      : t("trade.fundsReceived")}
             </Text>
             {resumeMutation.isPending ? <ActivityIndicator color={uiTokens.colors.ctaPrimary} /> : null}
           </View>
         ) : null}
 
-        <View className="mb-4">
-          <Text className="text-bundle-muted text-sm mb-2">Source des fonds</Text>
-          <BundlesSegmented<"cb" | "swap">
-            variant="emphasis"
-            options={[
-              { value: "cb", label: "Carte" },
-              { value: "swap", label: "Wallet" },
-            ]}
-            value={tradeTabMode}
-            onChange={(m) => {
-              if (m === "cb" && !onRampEnabled) return;
-              setTradeTabMode(m);
-            }}
-          />
-        </View>
+        <View className="rounded-[20px] bg-white p-4 mb-4" style={cardShadow}>
+          <View className="mb-4">
+            <Text className="text-bundle-muted text-sm mb-2">{t("trade.sourceOfFunds")}</Text>
+            <View className="h-16 rounded-[20px] bg-white flex-row items-center overflow-hidden border border-[#E5E5E5]">
+              {renderFundsSourceTab("cb", t("trade.card"), "card-outline")}
+              <View className="h-full w-[2px] bg-white" />
+              {renderFundsSourceTab("swap", t("trade.wallet"), "wallet-outline")}
+            </View>
+          </View>
 
-        <Text className="text-bundle-muted text-sm mb-1">Bundle</Text>
-        <Pressable
-          onPress={() => setPickerOpen(true)}
-          className="border border-bundle-border-subtle bg-bundle-card rounded-md p-3 mb-4"
-        >
-          <Text className="text-bundle-text">
-            {index ? `${index.name} (${index.symbol})` : "Sélectionner…"}
-          </Text>
-        </Pressable>
+          <Text className="text-bundle-muted text-sm mb-1">{t("trade.bundleLabel")}</Text>
+          <Pressable
+            onPress={() => setPickerOpen(true)}
+            className="border border-[#E5E5E5] bg-[#F7F8FA] rounded-[12px] p-3 mb-4"
+          >
+            <Text className="text-bundle-text">
+              {index ? `${index.name} (${index.symbol})` : t("trade.selectBundle")}
+            </Text>
+          </Pressable>
 
         {tradeTabMode === "cb" ? (
           <View className="mb-6">
             {!onRampEnabled ? (
               <Text className="text-red-600 mb-2">
-                Mode carte disponible uniquement sur Ethereum pour le moment.
+                  {t("trade.cardModeEthereumOnly")}
               </Text>
             ) : null}
             {onRampEnabled && thirdwebPayTestMode ? (
               <View className="bg-sky-50 border border-sky-200 rounded-md p-3 mb-3">
-                <Text className="text-sky-950 text-sm">
-                  Mode test Thirdweb Pay (Transak staging) : carte de test, pas de débit réel. Sur Ethereum
-                  mainnet, Transak indique souvent qu’aucun ETH n’est crédité malgré un ordre « réussi » — tu
-                  valides surtout le parcours UI + statut intent. Pour tester le swap bundle avec de vrais fonds,
-                  utilise l’onglet Wallet sur testnet (Fuji) ou un petit montant mainnet hors test mode.
-                </Text>
+                  <Text className="text-sky-950 text-sm">{t("trade.transakTestMode")}</Text>
               </View>
             ) : null}
-            <Text className="text-bundle-muted text-sm mb-1">Devise (paiement Transak)</Text>
+              <Text className="text-bundle-muted text-sm mb-1">{t("trade.transakCurrency")}</Text>
             <View className="flex-row flex-wrap gap-2 mb-3">
               {ONRAMP_FIAT_OPTIONS.map((o) => (
                 <Pressable
@@ -523,52 +573,46 @@ export function TradeScreen() {
                 </Pressable>
               ))}
             </View>
-            <Text className="text-bundle-muted text-sm mb-1">Montant ({fiatCurrency})</Text>
+              <Text className="text-bundle-muted text-sm mb-1">
+                {t("trade.amount")} ({fiatCurrency})
+              </Text>
             <BundlesTextInput
               value={fiatAmountText}
               onChangeText={setFiatAmountText}
               keyboardType="decimal-pad"
             />
-            <Text className="text-bundle-muted text-xs mt-1 mb-2">
-              Transak applique pays / KYC : le widget peut ajuster le montant final. La devise choisie sert au
-              devis thirdweb ; le pays de session suit en général l’IP (sauf variable d’env projet).
-            </Text>
+              <Text className="text-bundle-muted text-xs mt-1 mb-2">{t("trade.transakKycHint")}</Text>
             {modeAEstimate.isError ? (
-              <Text className="text-red-600 mt-2">Impossible d&apos;obtenir un prix. Réessayer.</Text>
+                <Text className="text-red-600 mt-2">{t("trade.unablePrice")}</Text>
             ) : null}
             {modeAEstimate.data ? (
               <View className="mt-3 gap-1">
                 <Text className="text-bundle-text">
-                  Est. tokens: {formatBundleAmount(modeAEstimate.data.estTokens, index?.symbol ?? "")}
+                    {t("trade.estimatedTokens")}: {formatBundleAmount(modeAEstimate.data.estTokens, index?.symbol ?? "")}
                 </Text>
                 <Text className="text-bundle-muted text-sm">
-                  ETH requis (est.): {formatEthFromWei(modeAEstimate.data.ethCost)}
+                    {t("trade.estimatedEthRequired")}: {formatEthFromWei(modeAEstimate.data.ethCost)}
                 </Text>
-                <Text className="text-bundle-muted text-sm">Frais: on-ramp ~1 % + gas variable</Text>
+                  <Text className="text-bundle-muted text-sm">{t("trade.feesHint")}</Text>
               </View>
             ) : null}
           </View>
         ) : (
           <View className="mb-6">
             <View className="mb-3">
-              <BundlesSegmented<"buy" | "sell">
-                variant="emphasis"
-                options={[
-                  { value: "buy", label: "Acheter" },
-                  { value: "sell", label: "Vendre" },
-                ]}
-                value={modeBDir}
-                onChange={setModeBDir}
-              />
+              <View className="h-12 rounded-[14px] bg-[#F4F5F7] p-1 flex-row items-center">
+                {renderTradeDirectionTab("buy", t("trade.buy"))}
+                {renderTradeDirectionTab("sell", t("trade.sell"))}
+              </View>
             </View>
-            <Text className="text-bundle-muted text-sm mb-1">Quantité (tokens bundle)</Text>
+              <Text className="text-bundle-muted text-sm mb-1">{t("trade.quantityBundleTokens")}</Text>
             <BundlesTextInput
               value={amountText}
               onChangeText={setAmountText}
               keyboardType="decimal-pad"
             />
             <Text className="text-bundle-muted text-sm mt-2">
-              Slippage ({SLIPPAGE_BPS_MIN}–{SLIPPAGE_BPS_MAX} bps, défaut aligné web 0,5&nbsp;%)
+                {t("trade.slippage")} ({SLIPPAGE_BPS_MIN}–{SLIPPAGE_BPS_MAX} {t("trade.slippageHintSuffix")})
             </Text>
             <BundlesTextInput
               value={String(slippageBps)}
@@ -580,59 +624,84 @@ export function TradeScreen() {
               className="mt-1"
             />
             {modeBQuote.isError ? (
-              <Text className="text-red-600 mt-2">Impossible d&apos;obtenir un prix. Réessayer.</Text>
+                <Text className="text-red-600 mt-2">{t("trade.unablePrice")}</Text>
             ) : null}
             {modeBQuote.data && "ethCost" in modeBQuote.data ? (
               <Text className="text-bundle-text mt-2">
-                Coût ETH: {formatEthFromWei(modeBQuote.data.ethCost)}
+                  {t("trade.ethCost")}: {formatEthFromWei(modeBQuote.data.ethCost)}
               </Text>
             ) : null}
             {modeBQuote.data && "ethProceeds" in modeBQuote.data ? (
               <Text className="text-bundle-text mt-2">
-                ETH reçu: {formatEthFromWei(modeBQuote.data.ethProceeds)}
+                  {t("trade.ethReceived")}: {formatEthFromWei(modeBQuote.data.ethProceeds)}
               </Text>
             ) : null}
           </View>
         )}
 
         {swapMutation.isError || openOnrampMutation.isError || resumeMutation.isError ? (
-          <Text className="text-red-600 mb-2">Action échouée. Réessayer.</Text>
+            <Text className="text-red-600 mb-2">{t("trade.actionFailed")}</Text>
         ) : null}
 
-        <BundlesButton
-          variant="primary"
-          disabled={Boolean(primaryDisabled)}
-          loading={swapMutation.isPending || openOnrampMutation.isPending}
-          onPress={() => void onPrimary()}
-        >
-          {tradeTabMode === "cb" ? "Continuer avec carte" : "Confirmer le swap"}
-        </BundlesButton>
+          <BundlesButton
+            variant="primary"
+            disabled={Boolean(primaryDisabled)}
+            loading={swapMutation.isPending || openOnrampMutation.isPending}
+            className="h-16 rounded-[20px] border-0"
+            style={{
+              backgroundColor: primaryDisabled ? "#AA03B6" : "#8A0294",
+              opacity: 1,
+            }}
+            onPress={() => void onPrimary()}
+          >
+            {tradeTabMode === "cb" ? t("trade.continueWithCard") : t("trade.confirmSwap")}
+          </BundlesButton>
+        </View>
       </ScrollView>
 
       <Modal visible={pickerOpen} animationType="slide" presentationStyle="pageSheet">
-        <View className="flex-1 bg-bundle-bg p-4">
-          <Text className="text-lg font-semibold mb-2">Choisir un bundle</Text>
-          <ScrollView>
-            {bundles.map((b) => (
-              <Pressable
-                key={b.address}
-                onPress={() => {
-                  setSelected(b.address);
-                  setPickerOpen(false);
-                }}
-                className="py-3 border-b border-bundle-border"
-              >
-                <Text className="text-bundle-text">
-                  {b.name} ({b.symbol})
-                </Text>
-              </Pressable>
-            ))}
-          </ScrollView>
-          <Pressable onPress={() => setPickerOpen(false)} className="mt-4">
-            <Text className="text-center text-bundle-muted">Fermer</Text>
-          </Pressable>
+        <View className="flex-1" style={{ backgroundColor: pageVioletBg }}>
+          <View className="absolute top-0 left-0 right-0">
+            <TopVioletGradient gradientId="tradePickerTopVioletFade" height={300} viewBoxHeight={300} />
+          </View>
+
+          <View className="flex-1 px-[14px] pt-[52px] pb-6">
+            <View className="rounded-[20px] bg-white p-4 mb-4" style={cardShadow}>
+              <Text className="text-[20px] leading-[24px] font-semibold text-[#181818] mb-2">
+                {t("trade.chooseBundle")}
+              </Text>
+              <ScrollView>
+                {bundles.map((b) => (
+                  <Pressable
+                    key={b.address}
+                    onPress={() => {
+                      setSelected(b.address);
+                      setPickerOpen(false);
+                    }}
+                    className="py-3 border-b border-[#E5E5E5] flex-row items-center active:opacity-80"
+                  >
+                    <Image
+                      source={{ uri: bundleIconUrl(b.address, activeChainId) }}
+                      style={{ width: 40, height: 40, borderRadius: 20 }}
+                    />
+                    <View className="ml-[10px] flex-1">
+                      <Text className="text-[16px] leading-[19px] font-medium text-[#181818]">
+                        {b.name}
+                      </Text>
+                      <Text className="text-[14px] text-[#A9AAB2]">{b.symbol}</Text>
+                    </View>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+
+            <Pressable onPress={() => setPickerOpen(false)} className="h-12 rounded-[14px] bg-white items-center justify-center" style={cardShadow}>
+              <Text className="text-[16px] font-medium text-[#8A0294]">{t("common.close")}</Text>
+            </Pressable>
+          </View>
         </View>
       </Modal>
     </View>
   );
 }
+

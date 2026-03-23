@@ -7,7 +7,7 @@ import { BundlesAppIcon } from "@/assets/brand/bundles-brand";
 import { uiTokens } from "@/lib/ui-tokens";
 
 interface AppHeaderProps {
-  /** Texte optionnel à droite du pictogramme (ex. titre d’écran). */
+  /** Optional text shown to the right of the app icon (for example a screen title). */
   title?: string;
   right?: ReactNode;
 }

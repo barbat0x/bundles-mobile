@@ -44,6 +44,14 @@ export function formatBundleAmount(units: number, symbol: string): string {
   return `${units.toFixed(4)} ${symbol}`;
 }
 
+export function formatWeightPercent(weightWei: bigint, totalWeightWei: bigint): string {
+  if (totalWeightWei <= 0n) return "0%";
+  const scaled = (weightWei * 10_000n) / totalWeightWei;
+  const integer = scaled / 100n;
+  const decimals = scaled % 100n;
+  return `${integer.toString()}.${decimals.toString().padStart(2, "0")}%`;
+}
+
 export function truncateAddress(addr: Address): string {
   const a = addr as string;
   if (a.length < 10) return a;

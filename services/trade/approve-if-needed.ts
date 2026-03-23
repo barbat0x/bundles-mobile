@@ -9,6 +9,7 @@ import { erc20Abi } from "viem";
 
 import type { SupportedChainId } from "@/lib/chains";
 import { getContracts } from "@/lib/contracts";
+import { t } from "@/lib/i18n";
 
 type Args = {
   publicClient: PublicClient;
@@ -47,6 +48,6 @@ export async function approveIfNeeded(a: Args): Promise<void> {
     transactionHash: submitted.transactionHash,
   });
   if (receipt.status !== "success") {
-    throw new Error("Approve reverted");
+    throw new Error(t("errors.approveReverted"));
   }
 }

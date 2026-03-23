@@ -1,14 +1,19 @@
 import * as Clipboard from "expo-clipboard";
 import { useRouter } from "expo-router";
-import { Alert, Linking, Pressable, ScrollView, Text, View } from "react-native";
+import { Alert, Linking, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import * as LocalAuth from "expo-local-authentication";
 import Constants from "expo-constants";
+import { Feather } from "@expo/vector-icons";
 import { useActiveAccount, useActiveWallet, useDisconnect } from "thirdweb/react-native";
 
 import { ConnectWalletButton } from "@/components/connect-wallet-button";
-import { BundlesButton, BundlesCard } from "@/components/ui";
+import { WalletMenuHeader } from "@/components/wallet-menu-header";
+import { TopVioletGradient } from "@/components/top-violet-gradient";
+import { BundlesButton } from "@/components/ui";
 
 import { truncateAddress } from "@/lib/format";
+import { t } from "@/lib/i18n";
+import { cardShadow, pageVioletBg } from "@/lib/ui-shell";
 
 export function SettingsScreen() {
   const router = useRouter();
@@ -21,49 +26,63 @@ export function SettingsScreen() {
   };
 
   const onExportNote = async () => {
-    const ok = await LocalAuth.authenticateAsync({ promptMessage: "Confirmer votre identité" });
-    if (!ok.success) return;
+    if (Platform.OS !== "web") {
+      const authResult = await LocalAuth.authenticateAsync({ promptMessage: t("settings.authPrompt") });
+      if (!authResult.success) return;
+    }
     Alert.alert(
-      "Exporter la clé",
-      "Utilisez le bouton Compte thirdweb ci-dessous : les options d’export de clé privée sont gérées dans le flux de wallet intégré après connexion.",
+      t("settings.exportAlertTitle"),
+      t("settings.exportAlertMessage"),
     );
   };
 
   return (
-    <View className="flex-1 bg-bundle-bg">
-      <ScrollView contentContainerClassName="p-4 gap-4">
-        <Text className="text-bundle-muted text-sm">Adresse</Text>
-        <Pressable onPress={() => void onCopy()}>
-          <BundlesCard className="p-3">
-            <Text className="text-bundle-text">
-              {account?.address ? truncateAddress(account.address as `0x${string}`) : "Non connecté"}
-            </Text>
-            <Text className="text-bundle-link text-sm mt-1">Copier</Text>
-          </BundlesCard>
-        </Pressable>
+    <View className="flex-1" style={{ backgroundColor: pageVioletBg }}>
+      <View className="absolute top-0 left-0 right-0">
+        <TopVioletGradient gradientId="settingsTopVioletFade" />
+      </View>
 
-        <ConnectWalletButton />
-
-        <Pressable onPress={() => void onExportNote()}>
-          <BundlesCard className="p-3">
-            <Text className="text-bundle-text font-medium">Exporter la clé privée</Text>
-            <Text className="text-bundle-muted text-sm mt-1">Protégé par biométrie — voir instructions</Text>
-          </BundlesCard>
-        </Pressable>
-
-        <BundlesButton
-          variant="danger"
-          className="w-full"
-          onPress={() => {
-            if (wallet) disconnect(wallet);
-            router.replace("/login");
-          }}
+      <ScrollView contentContainerClassName="px-[14px] pt-[52px] pb-16 gap-4">
+        <WalletMenuHeader />
+        <Pressable
+          onPress={() => router.back()}
+          className="h-10 w-10 rounded-full bg-[#F7F8FA] border border-[#E5E5E5] items-center justify-center"
+          style={cardShadow}
         >
-          Déconnexion
-        </BundlesButton>
+          <Feather name="chevron-left" size={20} color="#181818" />
+        </Pressable>
+        <View className="rounded-[20px] bg-white p-4" style={cardShadow}>
+          <Text className="text-bundle-muted text-sm mb-2">{t("settings.address")}</Text>
+          <Pressable onPress={() => void onCopy()} className="rounded-[12px] border border-[#E5E5E5] bg-[#F7F8FA] p-3 active:opacity-80">
+            <Text className="text-bundle-text">
+              {account?.address ? truncateAddress(account.address as `0x${string}`) : t("common.disconnected")}
+            </Text>
+            <Text className="text-bundle-link text-sm mt-1">{t("common.copy")}</Text>
+          </Pressable>
 
-        <Text className="text-bundle-muted text-xs mt-4">
-          Version {Constants.expoConfig?.version ?? "1.0.0"}
+          <View className="mt-4">
+            <ConnectWalletButton />
+          </View>
+
+          <Pressable onPress={() => void onExportNote()} className="mt-4 rounded-[12px] border border-[#E5E5E5] bg-[#F7F8FA] p-3 active:opacity-80">
+            <Text className="text-bundle-text font-medium">{t("settings.exportPrivateKey")}</Text>
+            <Text className="text-bundle-muted text-sm mt-1">{t("settings.exportPrivateKeyHint")}</Text>
+          </Pressable>
+
+          <BundlesButton
+            variant="primary"
+            className="w-full h-16 rounded-[20px] mt-4 bg-[#8A0294] border-0"
+            onPress={() => {
+              if (wallet) disconnect(wallet);
+              router.replace("/login");
+            }}
+          >
+            {t("settings.signOut")}
+          </BundlesButton>
+        </View>
+
+        <Text className="text-bundle-muted text-xs mt-2">
+          {t("common.version")} {Constants.expoConfig?.version ?? "1.0.0"}
         </Text>
         <Pressable onPress={() => void Linking.openURL("https://bundles.fi")}>
           <Text className="text-bundle-link">bundles.fi</Text>

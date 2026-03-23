@@ -12,6 +12,7 @@ import { amountMinAfterSlippage, toSlippageBpsBigint } from "@/lib/slippage";
 import { sellBundle } from "@/services/universal-router-client";
 
 import { approveIfNeeded } from "./approve-if-needed";
+import { t } from "@/lib/i18n";
 
 export type SellArgs = {
   publicClient: PublicClient;
@@ -43,7 +44,7 @@ export async function executeSell(a: SellArgs): Promise<{ transactionHash: strin
   const bps = toSlippageBpsBigint(a.slippageBps, SLIPPAGE_BPS);
   const minEthOut = amountMinAfterSlippage(quote.ethProceeds, bps);
   if (minEthOut <= 0n) {
-    throw new Error("Montant ETH minimal après slippage invalide");
+    throw new Error(t("errors.invalidMinEthOutAfterSlippage"));
   }
   const deadline = BigInt(Math.floor(Date.now() / 1000) + TX_DEADLINE_SECONDS);
 
@@ -71,7 +72,7 @@ export async function executeSell(a: SellArgs): Promise<{ transactionHash: strin
   });
 
   if (receipt.status !== "success") {
-    throw new Error("Sell transaction reverted");
+    throw new Error(t("errors.sellTransactionReverted"));
   }
 
   return { transactionHash: submitted.transactionHash };

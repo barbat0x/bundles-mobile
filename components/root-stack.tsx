@@ -6,7 +6,8 @@ import { useActiveAccount, useActiveWalletConnectionStatus } from "thirdweb/reac
 import { uiTokens } from "@/lib/ui-tokens";
 
 /**
- * Stack racine + redirection : sans wallet connecté → `/login`, sinon accès aux écrans app.
+ * Root stack + redirect: unauthenticated users go to `/login`,
+ * authenticated users can access app screens.
  */
 export function RootStack() {
   const router = useRouter();
@@ -45,9 +46,7 @@ export function RootStack() {
       <Stack.Screen
         name="settings"
         options={{
-          headerShown: true,
-          title: "Paramètres",
-          headerTitleStyle: { fontFamily: uiTokens.fontFamily.sansSemibold },
+          headerShown: false,
         }}
       />
     </Stack>

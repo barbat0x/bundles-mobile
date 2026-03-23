@@ -1,9 +1,9 @@
 /**
- * Devises fiat proposées pour l’on-ramp (thirdweb `Onramp.prepare` → Transak).
- * Transak impose des paires pays / devise / KYC côté widget ; ici on choisit la **devise de cotation**
- * alignée avec le `currency` du bridge (symbole ISO usuel : EUR, USD, …).
+ * Supported fiat currencies for on-ramp flow (thirdweb `Onramp.prepare` -> Transak).
+ * Transak applies country/currency/KYC constraints in the widget; here we select the
+ * quote currency aligned with bridge `currency` (standard ISO symbols: EUR, USD, ...).
  *
- * @see https://docs.transak.com/docs/fiat-currencies — liste plus large côté Transak ; on garde un sous-ensemble stable pour l’UI.
+ * @see https://docs.transak.com/docs/fiat-currencies - broader Transak list; we keep a stable UI subset.
  */
 export const ONRAMP_FIAT_OPTIONS = [
   { code: "EUR" as const, label: "EUR €", coingeckoVs: "eur" },
@@ -19,7 +19,7 @@ export function coingeckoVsForFiat(code: OnRampFiatCurrencyCode): string {
   return row?.coingeckoVs ?? "eur";
 }
 
-/** Devise par défaut selon le locale (US → USD, UK → GBP, sinon EUR). */
+/** Default fiat currency from locale (US -> USD, UK -> GBP, otherwise EUR). */
 export function defaultOnRampFiatCurrency(): OnRampFiatCurrencyCode {
   let locale = "";
   try {

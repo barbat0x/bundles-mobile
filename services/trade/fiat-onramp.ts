@@ -12,6 +12,7 @@ import {
 } from "@/lib/fiat-onramp-currencies";
 import type { SupportedChainId } from "@/lib/chains";
 import { isOnRampEnabledChain } from "@/lib/chains";
+import { t } from "@/lib/i18n";
 import { assertTrustedTransakOnRampUrl } from "@/lib/onramp-url";
 import { fetchEthPriceInFiat } from "@/services/prices/eth-fiat";
 
@@ -60,7 +61,7 @@ function parsePositiveFiatAmount(raw: string | number): number {
   const s = typeof raw === "number" ? String(raw) : String(raw).trim();
   const n = Number.parseFloat(s.replace(",", "."));
   if (!Number.isFinite(n) || n <= 0) {
-    throw new Error("Montant invalide");
+    throw new Error(t("errors.invalidAmount"));
   }
   return n;
 }
@@ -68,7 +69,7 @@ function parsePositiveFiatAmount(raw: string | number): number {
 /** ETH amount in human units used to derive wei for `Onramp.prepare`. */
 function ethHumanToToAmountString(eth: number): string {
   if (!Number.isFinite(eth) || eth <= 0) {
-    throw new Error("Montant ETH estimé invalide");
+    throw new Error(t("errors.invalidEstimatedEthAmount"));
   }
   const s = eth.toFixed(18);
   return s.replace(/\.?0+$/, "") || "0";
@@ -119,7 +120,7 @@ export async function quoteFiatToEthOnramp(args: {
   fiatCurrency: OnRampFiatCurrencyCode;
 }): Promise<FiatOnrampQuote> {
   if (!isOnRampEnabledChain(args.chainId)) {
-    throw new Error("On-ramp indisponible sur ce réseau");
+    throw new Error(t("errors.onRampUnavailable"));
   }
   const walletAddress = getAddress(args.walletAddress as Address);
   const fiat = parsePositiveFiatAmount(args.fiatAmount);

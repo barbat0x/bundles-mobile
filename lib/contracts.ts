@@ -17,14 +17,14 @@ export const SLIPPAGE_BPS = 50n;
 
 export const TX_DEADLINE_SECONDS = 300;
 
-/** Après achat CB → ETH (mainnet), on évite de tout passer en bundle pour laisser ~ce montant en USD en ETH pour gas / ventes. */
+/** After card purchase -> ETH (mainnet), keep roughly this USD amount in ETH for gas and later sells. */
 export const POST_ONRAMP_RESERVE_USD = 2;
 
 /**
- * Heuristique : le solde doit couvrir `msg.value` (max ETH du swap) **+** une marge pour le **gas**
- * (même compte EOA). Sinon un utilisateur qui « met 100 % » de son ETH via on-ramp peut voir
- * le gate `funds_ready` à true alors que la tx échoue faute de gas.
- * Pas un estimateGas on-chain (trop lourd à poller) — à ajuster si besoin.
+ * Heuristic: balance should cover swap `msg.value` (max ETH input) plus gas margin
+ * from the same EOA account. Without that margin, a user may see `funds_ready = true`
+ * while transaction still fails due to gas shortage.
+ * This is intentionally lighter than repeated on-chain estimateGas calls.
  */
 export function getModeAGasBufferWei(chainId: number): bigint {
   if (chainId === 1) return 2n * 10n ** 15n; // ~0.002 ETH

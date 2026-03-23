@@ -1,3 +1,5 @@
+import { t } from "@/lib/i18n";
+
 /**
  * Slippage helpers aligned with bundles-frontend `ExchangeRouter`:
  * - `getAmountWithSlippageDown`: out_min = amount - amount * (tolerance% * 100) / 10_000
@@ -21,7 +23,7 @@ export function clampSlippageBps(n: number): number {
 export function toSlippageBpsBigint(bps: bigint | undefined, fallback: bigint): bigint {
   const v = bps ?? fallback;
   if (v < 1n || v > BigInt(SLIPPAGE_BPS_MAX)) {
-    throw new Error("Slippage hors plage");
+    throw new Error(t("errors.slippageOutOfRange"));
   }
   return v;
 }
