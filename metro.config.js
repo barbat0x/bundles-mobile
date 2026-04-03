@@ -15,4 +15,16 @@ config.resolver = {
   sourceExts: [...config.resolver.sourceExts, "svg"],
 };
 
+const defaultResolveRequest = config.resolver.resolveRequest;
+config.resolver.resolveRequest = (context, moduleName, platform) => {
+  if (moduleName === "crypto") {
+    return context.resolveRequest(context, "react-native-quick-crypto", platform);
+  }
+
+  return defaultResolveRequest
+    ? defaultResolveRequest(context, moduleName, platform)
+    : context.resolveRequest(context, moduleName, platform);
+};
+
+
 module.exports = withNativeWind(config, { input: "./global.css" });

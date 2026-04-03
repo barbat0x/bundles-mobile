@@ -13,12 +13,13 @@ import {
 import { uiTokens } from "@/lib/ui-tokens";
 import { useNetworkStore } from "@/store/network-store";
 import { bundleIconUrl } from "@/lib/media";
-import { formatPct, formatUsd } from "@/lib/format";
+import { formatFiatAmount, formatPct } from "@/lib/format";
 import { t } from "@/lib/i18n";
 import type { SupportedChainId } from "@/lib/chains";
 import { WalletMenuHeader } from "@/components/wallet-menu-header";
 import { TopVioletGradient } from "@/components/top-violet-gradient";
 import { cardShadow, pageVioletBg } from "@/lib/ui-shell";
+import { useUsdToFiatRate } from "@/hooks/use-fiat-display";
 
 type SortKey = "featured" | "market-cap" | "price-change";
 const marketCapScale = 1_000_000n;
@@ -31,6 +32,7 @@ export function BundlesListScreen() {
   const enrichedBundlesQuery = useEnrichedBundleList(bundlesQuery.data, activeChainId);
   const [refreshing, setRefreshing] = useState(false);
   const [sort, setSort] = useState<SortKey>("featured");
+  const { fiatCurrency, usdToFiatRate } = useUsdToFiatRate();
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -149,6 +151,8 @@ export function BundlesListScreen() {
                   bundle={item}
                   rank={index + 1}
                   chainId={activeChainId}
+                  fiatCurrency={fiatCurrency}
+                  usdToFiatRate={usdToFiatRate}
                   onPress={() => router.push(`/bundle/${item.address}`)}
                 />
               ))
@@ -183,11 +187,15 @@ function BundleRow({
   bundle,
   rank,
   chainId,
+  fiatCurrency,
+  usdToFiatRate,
   onPress,
 }: {
   bundle: EnrichedBundle;
   rank: number;
   chainId: SupportedChainId;
+  fiatCurrency: string;
+  usdToFiatRate: number;
   onPress: () => void;
 }) {
   const variation = bundle.stats?.priceVariations?.lastDay;
@@ -203,7 +211,9 @@ function BundleRow({
         <Text className="text-[14px] text-[#A9AAB2]">{bundle.symbol}</Text>
       </View>
       <View className="items-end">
-        <Text className="text-[15px] text-[#181818]">{formatUsd(bundle.stats?.priceUSD ?? 0)}</Text>
+        <Text className="text-[15px] text-[#181818]">
+          {formatFiatAmount((bundle.stats?.priceUSD ?? 0) * usdToFiatRate, fiatCurrency)}
+        </Text>
         <Text className="text-[13px] text-[#A9AAB2]">{formatPct(variation).text}</Text>
       </View>
     </Pressable>

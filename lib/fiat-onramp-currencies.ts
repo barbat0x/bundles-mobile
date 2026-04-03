@@ -10,6 +10,7 @@ export const ONRAMP_FIAT_OPTIONS = [
   { code: "USD" as const, label: "USD $", coingeckoVs: "usd" },
   { code: "GBP" as const, label: "GBP £", coingeckoVs: "gbp" },
   { code: "CHF" as const, label: "CHF", coingeckoVs: "chf" },
+  { code: "DKK" as const, label: "DKK kr", coingeckoVs: "dkk" },
 ] as const;
 
 export type OnRampFiatCurrencyCode = (typeof ONRAMP_FIAT_OPTIONS)[number]["code"];
@@ -33,6 +34,7 @@ export function defaultOnRampFiatCurrency(): OnRampFiatCurrencyCode {
   }
   if (locale === "en-us" || locale.endsWith("-us")) return "USD";
   if (locale.endsWith("-gb") || locale === "en-gb") return "GBP";
+  if (locale.endsWith("-dk") || locale === "da-dk") return "DKK";
   if (locale.endsWith("-ch") || locale.startsWith("de-ch") || locale.startsWith("fr-ch")) return "CHF";
   return "EUR";
 }

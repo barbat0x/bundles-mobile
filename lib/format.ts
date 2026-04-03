@@ -1,4 +1,5 @@
 import type { Address } from "viem";
+import { formatUnits } from "viem";
 
 /** PLAN §5.7 formatting table */
 export function formatCompactUsd(n: number): string {
@@ -13,6 +14,15 @@ export function formatUsd(n: number): string {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(n);
+}
+
+export function formatFiatAmount(n: number, currency: string, locale = "en-US"): string {
+  return new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency,
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(n);
@@ -36,7 +46,8 @@ export function formatPct(variation: number | undefined): { text: string; positi
 }
 
 export function formatEthFromWei(wei: bigint): string {
-  const s = (Number(wei) / 1e18).toPrecision(6);
+  const eth = Number.parseFloat(formatUnits(wei, 18));
+  const s = Number.isFinite(eth) ? eth.toPrecision(6) : "0";
   return `${s} ETH`;
 }
 

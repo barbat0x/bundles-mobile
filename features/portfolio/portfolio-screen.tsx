@@ -4,6 +4,7 @@ import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } 
 import Svg, { Path } from "react-native-svg";
 import { useNetInfo } from "@react-native-community/netinfo";
 import { useActiveAccount } from "thirdweb/react-native";
+import { useQuery } from "@tanstack/react-query";
 
 import { ConnectWalletButton } from "@/components/connect-wallet-button";
 import { BundlesButton } from "@/components/ui";
@@ -14,7 +15,7 @@ import {
   PortfolioFigmaSendIcon,
   PortfolioFigmaSwapIcon,
 } from "@/assets/utility/portfolio-figma-icons";
-import { formatPct, formatUsd } from "@/lib/format";
+import { formatFiatAmount, formatPct } from "@/lib/format";
 import { t } from "@/lib/i18n";
 import { bundleIconUrl } from "@/lib/media";
 import { uiTokens } from "@/lib/ui-tokens";
@@ -26,6 +27,9 @@ import {
 } from "@/features/portfolio/portfolio-queries";
 import { useCallback, useState, type ReactNode } from "react";
 import { useNetworkStore } from "@/store/network-store";
+import { useFiatPreferencesStore } from "@/store/fiat-preferences-store";
+import { resolveEffectiveFiatCurrency, resolveUserCountryCode } from "@/lib/fiat-country-capabilities";
+import { fetchUsdToSelectedFiatRate } from "@/services/prices/usd-fiat";
 
 type PortfolioTimeframe = "H" | "D" | "W" | "Y";
 const accentViolet = "#AA03B6";
@@ -62,8 +66,21 @@ export function PortfolioScreen() {
   const posQ = useUserPositions(effectiveAddress, activeChainId);
   const { rows, isLoading: enrichLoading } = useEnrichedPositions(posQ.data, activeChainId);
   const [refreshing, setRefreshing] = useState(false);
+  const preferredFiatCurrency = useFiatPreferencesStore((s) => s.preferredFiatCurrency);
+  const fiatResolution = resolveEffectiveFiatCurrency({
+    countryCode: resolveUserCountryCode(),
+    userPreference: preferredFiatCurrency,
+  });
+  const fiatCurrency = fiatResolution.effectiveFiatCurrency;
+  const usdToFiatRateQuery = useQuery({
+    queryKey: ["prices", "usd-to-fiat", fiatCurrency],
+    queryFn: () => fetchUsdToSelectedFiatRate(fiatCurrency),
+    staleTime: 60_000,
+  });
 
   const total = sumPortfolioUsd(rows);
+  const usdToFiatRate = usdToFiatRateQuery.data ?? 1;
+  const totalFiat = total * usdToFiatRate;
   const dayW = rows.reduce((s, r) => s + (r.stats?.priceVariations?.lastDay ?? 0), 0) / (rows.length || 1);
   const dayPct = formatPct(dayW);
   const [selectedTimeframe, setSelectedTimeframe] = useState<PortfolioTimeframe>("D");
@@ -116,7 +133,9 @@ export function PortfolioScreen() {
             <View className="px-5 pt-5">
               <View className="flex-row items-center justify-between">
                 <Text className="text-[20px] leading-[24px] font-semibold text-[#181818]">{t("portfolio.portfolio")}</Text>
-                <Text className="text-[20px] leading-[24px] font-semibold text-[#181818]">{formatUsd(total)}</Text>
+                <Text className="text-[20px] leading-[24px] font-semibold text-[#181818]">
+                  {formatFiatAmount(totalFiat, fiatCurrency)}
+                </Text>
               </View>
               <Text className="text-right text-[16px] mt-1" style={{ color: "#A9AAB2" }}>
                 {dayPct.text}
@@ -209,7 +228,9 @@ export function PortfolioScreen() {
                       </Text>
                     </View>
                     <View className="items-end">
-                      <Text className="text-[15px] text-[#181818]">{formatUsd(item.valueUsd)}</Text>
+                      <Text className="text-[15px] text-[#181818]">
+                        {formatFiatAmount(item.valueUsd * usdToFiatRate, fiatCurrency)}
+                      </Text>
                       <Text className="text-[13px] text-[#A9AAB2]">{formatPct(day).text}</Text>
                     </View>
                   </Pressable>

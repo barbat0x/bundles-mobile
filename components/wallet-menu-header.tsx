@@ -7,6 +7,7 @@ import { useActiveAccount, useProfiles, useWalletBalance } from "thirdweb/react-
 
 import { getThirdwebChain } from "@/lib/chain-runtime";
 import { truncateAddress } from "@/lib/format";
+import { t } from "@/lib/i18n";
 import { getThirdwebBrowserClient } from "@/lib/thirdweb";
 import { useNetworkStore } from "@/store/network-store";
 import { ConnectWalletButton } from "@/components/connect-wallet-button";
@@ -50,7 +51,9 @@ export function WalletMenuHeader() {
       <View className="h-10 rounded-full bg-[#F7F8FA] border border-[#E5E5E5] px-3 items-center justify-center">
         {account?.address ? (
           <Text className="text-[16px] text-[#181818]">
-            {ethBal.data ? `${Number(ethBal.data.displayValue).toFixed(4)} ETH` : "0 ETH"}
+            {ethBal.data
+              ? `${t("common.networkFees")}: ${Number(ethBal.data.displayValue).toFixed(4)} ETH`
+              : `${t("common.networkFees")}: 0 ETH`}
           </Text>
         ) : (
           <ConnectWalletButton />

@@ -3,12 +3,14 @@ import { Pressable, Text, View } from "react-native";
 
 import { BundlesButton } from "@/components/ui";
 import { Sparkline } from "@/components/sparkline";
-import { formatCompactUsd, formatPct, formatUsd } from "@/lib/format";
+import { formatFiatAmount, formatPct } from "@/lib/format";
 import { bundleIconUrl } from "@/lib/media";
 import { uiTokens } from "@/lib/ui-tokens";
+import { t } from "@/lib/i18n";
 import { useWeekSparkline } from "@/features/bundles/bundles-queries";
 import type { EnrichedBundle } from "@/features/bundles/bundles-queries";
 import type { SupportedChainId } from "@/lib/chains";
+import { useUsdToFiatRate } from "@/hooks/use-fiat-display";
 
 interface BundleCardProps {
   bundle: EnrichedBundle;
@@ -19,11 +21,14 @@ interface BundleCardProps {
 
 export function BundleCard({ bundle, chainId, onPress, onView }: BundleCardProps) {
   const { data: spark } = useWeekSparkline(bundle.address, chainId);
+  const { fiatCurrency, usdToFiatRate } = useUsdToFiatRate();
   const price = bundle.stats?.priceUSD;
   const { text: varText, positive: varPos } = formatPct(bundle.stats?.priceVariations?.lastDay);
 
   const totalSupplyUnits = Number(bundle.totalSupply) / 10 ** bundle.decimals;
   const mcap = price !== undefined ? price * totalSupplyUnits : undefined;
+  const priceFiat = price !== undefined ? price * usdToFiatRate : undefined;
+  const mcapFiat = mcap !== undefined ? mcap * usdToFiatRate : undefined;
 
   const assets = bundle.assets.slice(0, 5);
   const more = bundle.assets.length - assets.length;
@@ -70,7 +75,7 @@ export function BundleCard({ bundle, chainId, onPress, onView }: BundleCardProps
               className="text-bundle-text"
               style={{ fontFamily: uiTokens.fontFamily.sansSemibold }}
             >
-              {price !== undefined ? formatUsd(price) : "—"}
+              {priceFiat !== undefined ? formatFiatAmount(priceFiat, fiatCurrency) : "—"}
             </Text>
             <Text style={{ color: varPos ? uiTokens.colors.success : uiTokens.colors.danger }} className="text-sm font-mono">
               {varText} <Text className="text-bundle-muted">24h</Text>
@@ -78,11 +83,11 @@ export function BundleCard({ bundle, chainId, onPress, onView }: BundleCardProps
           </View>
           <View className="items-end">
             <Text className="text-bundle-muted text-xs">MCap</Text>
-            <Text className="text-bundle-text font-mono">{mcap !== undefined ? formatCompactUsd(mcap) : "—"}</Text>
+            <Text className="text-bundle-text font-mono">{mcapFiat !== undefined ? formatFiatAmount(mcapFiat, fiatCurrency) : "—"}</Text>
           </View>
         </Pressable>
         <BundlesButton variant="secondary" size="sm" onPress={onView}>
-          Voir
+          {t("common.view")}
         </BundlesButton>
       </View>
     </View>

@@ -1,4 +1,8 @@
 import {
+  AzeretMono_400Regular,
+  AzeretMono_500Medium,
+} from "@expo-google-fonts/azeret-mono";
+import {
   Outfit_300Light,
   Outfit_400Regular,
   Outfit_500Medium,
@@ -6,25 +10,24 @@ import {
   Outfit_700Bold,
   useFonts as useOutfitFonts,
 } from "@expo-google-fonts/outfit";
-import {
-  AzeretMono_400Regular,
-  AzeretMono_500Medium,
-} from "@expo-google-fonts/azeret-mono";
 import { DefaultTheme, ThemeProvider } from "@react-navigation/native";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
 import { Text } from "react-native";
+import { install as installQuickCrypto } from "react-native-quick-crypto";
 import "react-native-reanimated";
 
 import { ThirdwebProvider } from "thirdweb/react-native";
 
 import { RootStack } from "@/components/root-stack";
-import { AppQueryProvider } from "@/providers/query-provider";
 import { uiTokens } from "@/lib/ui-tokens";
+import { AppQueryProvider } from "@/providers/query-provider";
 
 import "../global.css";
 
 export { ErrorBoundary } from "expo-router";
+
+installQuickCrypto();
 
 SplashScreen.preventAutoHideAsync();
 

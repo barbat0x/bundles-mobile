@@ -6,16 +6,17 @@ import { BundlesSegmented } from "@/components/ui";
 import type { HistoryTimeframe } from "@/services/bundles-ws/token-api";
 import { uiTokens } from "@/lib/ui-tokens";
 import { t } from "@/lib/i18n";
-import { formatUsd } from "@/lib/format";
+import { formatFiatAmount } from "@/lib/format";
+import { useUsdToFiatRate } from "@/hooks/use-fiat-display";
 
 import type { PricePoint } from "@/types";
 
 const PERIODS: { key: HistoryTimeframe; label: string }[] = [
-  { key: "day", label: "1J" },
-  { key: "week", label: "7J" },
+  { key: "day", label: "1D" },
+  { key: "week", label: "7D" },
   { key: "month", label: "1M" },
-  { key: "year", label: "1A" },
-  { key: "all", label: "Tout" },
+  { key: "year", label: "1Y" },
+  { key: "all", label: "All" },
 ];
 
 interface PriceChartProps {
@@ -27,6 +28,7 @@ interface PriceChartProps {
 
 export function PriceChart({ data, loading, timeframe, onChangeTimeframe }: PriceChartProps) {
   const [w, setW] = useState(280);
+  const { fiatCurrency, usdToFiatRate } = useUsdToFiatRate();
   const h = 140;
   const pts = useMemo(() => {
     if (data.length < 2) return "";
@@ -59,7 +61,7 @@ export function PriceChart({ data, loading, timeframe, onChangeTimeframe }: Pric
         className="items-center"
       >
         {loading ? (
-          <Text className="text-bundle-muted">Chargement…</Text>
+          <Text className="text-bundle-muted">{t("chart.loading")}</Text>
         ) : pts ? (
           <Svg width={w} height={h}>
             <Polyline points={pts} fill="none" stroke={uiTokens.colors.chartLine} strokeWidth="2" />
@@ -69,7 +71,9 @@ export function PriceChart({ data, loading, timeframe, onChangeTimeframe }: Pric
         )}
       </View>
       {last !== undefined ? (
-        <Text className="text-bundle-muted text-sm mt-2 font-mono">Prix: {formatUsd(last)}</Text>
+        <Text className="text-bundle-muted text-sm mt-2 font-mono">
+          {t("chart.priceLabel")}: {formatFiatAmount(last * usdToFiatRate, fiatCurrency)}
+        </Text>
       ) : null}
     </View>
   );

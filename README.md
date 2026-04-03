@@ -1,90 +1,100 @@
-# bundles-fi-mobile
+# bundles.fi mobile
 
-Application mobile Expo/React Native pour acheter/vendre des bundles via `@bundlesfi/universal-router`.
+Expo / React Native app for investing in DeFi index bundles via fiat (thirdweb In-App Wallet, Transak on-ramp, `@bundlesfi/universal-router`). **TypeScript strict**, **Expo SDK 55+**, **Expo Router**.
 
-## Branding / UI
+**Troubleshooting:** [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) — start with **High-friction local setup** for the hardest local setup issues.
 
-- Aligné sur `**bundles-frontend**` en **thème clair uniquement** (pas de `dark:` — équivalent du mode Day / défaut sur le web).
-- **Primitives** (`components/ui/`): `BundlesButton` (variants primary/secondary/…, `rounded-full`), `BundlesTextInput`, `BundlesCard`, `BundlesSegmented` (radio-group / tabs).
-- Tokens: `lib/ui-tokens.ts` + classes Tailwind `bundle.*` (`tailwind.config.js`).
+## Stack (one line)
 
-## Thirdweb Pay — fiat (test)
-
-- Variable `**EXPO_PUBLIC_THIRDWEB_PAY_TEST_MODE`** : `true` active `isTestMode` sur `[getBuyWithFiatQuote](https://portal.thirdweb.com/references/typescript/v5/getBuyWithFiatQuote)` (fournisseur en **staging**, ex. cartes test Transak — pas de débit réel).
-- **Ne jamais** mettre `true` en build production / store.
-- Parcours **fiat → ETH → bundle** (Carte / Ethereum) : voir `**[docs/E2E-TESTING.md](docs/E2E-TESTING.md)`**.
-- Cartes / règles Transak : [Test credentials](https://docs.transak.com/docs/test-credentials).
-
-## Multi-chain (switch in-app)
-
-- L'app est maintenant config-driven par réseau (`lib/chains.ts`) avec:
-  - contrats protocol par chain,
-  - subgraph id The Graph par chain,
-  - metadata explorer/symbole natif.
-- Le réseau actif est persistant (`store/network-store.ts`) et sélectionnable dans l'UI via `NetworkSwitch`.
-- Les flux data + trade utilisent ce réseau actif:
-  - GraphQL,
-  - WebSocket pricing/history,
-  - public client viem,
-  - chain thirdweb pour wallet balance/transactions.
+Expo SDK 55 · React Native 0.83 · NativeWind · TanStack Query · Zustand · thirdweb v5 · viem. Deeper product/architecture notes may live in local-only files (e.g. Cursor); not duplicated in this repo.
 
 ## Prerequisites
 
-- Node.js 20+
-- npm 10+
-- Expo CLI (via `npx expo ...`)
-- Optionnel pour device:
-  - iOS: Xcode + Simulator (macOS)
-  - Android: Android Studio + emulator
-  - ou Expo Go sur téléphone
-- Pour **régénérer** le paquet router : clone/build du repo `universal-router`, puis `npm pack` vers `vendor/` (voir `TROUBLESHOOTING.md`).
-- `@bundlesfi/universal-router` est consommé via `**vendor/bundlesfi-universal-router-*.tgz`** (contient `dist/`) — pas via `file:../` ni Git seul.
 
-## Installation locale
+| Tool         | Notes                                                            |
+| ------------ | ---------------------------------------------------------------- |
+| **Node.js**  | **22.x** recommended (see `.nvmrc`; `engines` in `package.json`) |
+| **npm**      | **10+**                                                          |
+| **Expo CLI** | Via `npx expo` (no global install required)                      |
+| **Android**  | Android Studio + SDK (emulator or device) for native builds      |
+| **iOS**      | Xcode + Simulator (**macOS only**)                               |
+| **EAS CLI**  | Optional: `npm i -g eas-cli` for cloud builds                    |
 
-1. Installer les dépendances:
 
-```bash
-npm install
-```
-
-1. Créer le fichier d'environnement:
+## Installation
 
 ```bash
+git clone <repository-url>
+cd bundles-fi-mobile
+npm ci
 cp .env.example .env
+# Edit .env — see table below
 ```
 
-1. Renseigner les variables minimum dans `.env`:
+### `@bundlesfi/universal-router`
 
-- `EXPO_PUBLIC_THIRDWEB_CLIENT_ID`
-- `EXPO_PUBLIC_GRAPH_API_KEY`
-- `EXPO_PUBLIC_API_WS_ENDPOINT` (par défaut `wss://api.bundles.fi/ws/`)
-- `EXPO_PUBLIC_RPC_FALLBACK_URL` (par défaut `https://0xrpc.io/eth`)
+The app consumes a **versioned tarball** under `vendor/bundlesfi-universal-router-*.tgz` (includes `dist/`). A Git-only checkout of the router repo is **not** enough for Metro — see [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) if you need to regenerate the package.
 
-## Lancement local
+## Environment variables
 
-### Démarrer Metro
+Copy `.env.example` to `.env`. All public app config uses the `EXPO_PUBLIC_`* prefix (embedded in the client bundle — **no secrets**).
+
+
+| Variable                                | Required    | Description                                                                           |
+| --------------------------------------- | ----------- | ------------------------------------------------------------------------------------- |
+| `EXPO_PUBLIC_THIRDWEB_CLIENT_ID`        | **Yes**     | thirdweb client ID                                                                    |
+| `EXPO_PUBLIC_GRAPH_API_KEY`             | **Yes**     | The Graph / gateway key                                                               |
+| `EXPO_PUBLIC_API_WS_ENDPOINT`           | No*         | Bundles WS API (default in example: `wss://api.bundles.fi/ws/`)                       |
+| `EXPO_PUBLIC_RPC_FALLBACK_URL`          | No*         | RPC fallback (default in example)                                                     |
+| `EXPO_PUBLIC_SENTRY_DSN`                | No          | Sentry DSN (public)                                                                   |
+| `EXPO_PUBLIC_TRANSAK_API_KEY`           | For on-ramp | Transak API key                                                                       |
+| `EXPO_PUBLIC_THIRDWEB_PAY_TEST_MODE`    | No          | `true` = thirdweb Pay / Transak **test** mode — **never `true` for store production** |
+| `EXPO_PUBLIC_ONRAMP_COUNTRY`            | No          | ISO2 on-ramp country (e.g. `FR`)                                                      |
+| `EXPO_PUBLIC_ALCHEMY_API_KEY`           | No          | Optional RPC / pricing fallback                                                       |
+| `EXPO_PUBLIC_DEV_BYPASS_PORTFOLIO_AUTH` | No          | Dev-only portfolio gate bypass                                                        |
+
+
+Has defaults in `.env.example`; set explicitly if your environment differs.
+
+## npm scripts
+
+
+| Script      | Command                                |
+| ----------- | -------------------------------------- |
+| Start Metro | `npm start` → `expo start`             |
+| Android     | `npm run android` → `expo run:android` |
+| iOS         | `npm run ios` → `expo run:ios`         |
+| Web         | `npm run web` → `expo start --web`     |
+| Typecheck   | `npm run typecheck`                    |
+| Lint        | `npm run lint`                         |
+| Test        | `npm run test`                         |
+
+
+## Run locally
+
+Default dev server port in this repo is often **8082** (avoid collisions):
 
 ```bash
-npx expo start --port 8082  --web
+npx expo start --port 8082
 ```
 
-Puis:
-
-- `a` pour Android emulator
-- `i` pour iOS simulator
-- scanner le QR code avec Expo Go
-
-### Raccourcis scripts
+Then press `a` (Android), `i` (iOS), or scan QR for **Expo Go** (when compatible).
 
 ```bash
-npx expo start --port 8082  --web
 npm run android
 npm run ios
 npm run web
 ```
 
-## Vérifications qualité
+## EAS Build
+
+Profiles are defined in [eas.json](eas.json): **development** (dev client), **preview**, **production**. Android builds use the **sdk-55** image unless overridden. See [EAS Build](https://docs.expo.dev/build/introduction/) and [eas.json](https://docs.expo.dev/eas/json/eas-json/).
+
+```bash
+eas build -p android --profile preview
+```
+
+## Quality gates
 
 ```bash
 npm run typecheck
@@ -92,19 +102,21 @@ npm run lint
 npm test
 ```
 
-## Troubleshooting
+## Security
 
-- See `TROUBLESHOOTING.md` for recurring setup/runtime issues and fixes.
-- Current known issues documented:
-  - Linux/WSL missing `libasound.so.2` for RN DevTools
-  - Expo SDK dependency version drift warnings
-  - The Graph gateway auth URL format
+- Do **not** commit `.env`, keystores, or private keys.
+- Contract addresses stay in [lib/contracts.ts](lib/contracts.ts) (whitelist only).
 
-## Notes importantes
+## Branding / UI (short)
 
-- Le projet utilise Expo Router (`expo-router/entry`).
-- OTA updates sont désactivées en production dans `app.json`.
-- L'on-ramp est via thirdweb Pay avec provider Transak.
-- Le mode one-click all est implémenté en auto-swap Mode A (trigger après détection des fonds + reprise via intent persistant).
-- `@bundlesfi/universal-router` : **tarball versionné** sous `vendor/bundlesfi-universal-router-0.0.12.tgz` (généré avec `npm run build` + `npm pack` dans le repo router — voir `TROUBLESHOOTING.md`). Une install **Git seule** ne fournit pas `dist/`, donc Metro échoue.
+Light theme aligned with **bundles-frontend**; UI primitives under `components/ui/`, tokens in `lib/ui-tokens.ts` and `tailwind.config.js`.
+
+## Thirdweb Pay (fiat test)
+
+`EXPO_PUBLIC_THIRDWEB_PAY_TEST_MODE=true` enables test/staging fiat flows — **not** for production store builds. (Optional E2E notes may exist locally under `docs/` — not part of the tracked docs set.)
+
+## More documentation
+
+This repository intentionally tracks **this README** and **[docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)** only. Other Markdown (architecture notes, parity reports, `AGENTS`, `PLAN`, etc.) can live **locally** for Cursor or internal use — use `git add -f <file>` if you ever need to push an exception.
+
 

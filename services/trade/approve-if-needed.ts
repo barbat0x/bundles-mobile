@@ -10,6 +10,7 @@ import { erc20Abi } from "viem";
 import type { SupportedChainId } from "@/lib/chains";
 import { getContracts } from "@/lib/contracts";
 import { t } from "@/lib/i18n";
+import type { SwapExecutionProgressEvent } from "@/features/trade/swap-execution-state";
 
 type Args = {
   publicClient: PublicClient;
@@ -19,9 +20,11 @@ type Args = {
   account: Account;
   token: Address;
   amount: bigint;
+  onProgress?: (event: SwapExecutionProgressEvent) => void;
 };
 
 export async function approveIfNeeded(a: Args): Promise<void> {
+  a.onProgress?.({ step: "approval_check", status: "pending" });
   const contracts = getContracts(a.chainId);
   const allowance = await a.publicClient.readContract({
     address: a.token,
@@ -29,7 +32,13 @@ export async function approveIfNeeded(a: Args): Promise<void> {
     functionName: "allowance",
     args: [a.account.address as Address, contracts.universalRouter],
   });
-  if (allowance >= a.amount) return;
+  if (allowance >= a.amount) {
+    a.onProgress?.({ step: "approval_check", status: "done" });
+    a.onProgress?.({ step: "approval_confirmed", status: "done" });
+    return;
+  }
+  a.onProgress?.({ step: "approval_check", status: "done" });
+  a.onProgress?.({ step: "approval_pending", status: "pending" });
 
   const contract = getContract({
     client: a.twClient,
@@ -42,12 +51,20 @@ export async function approveIfNeeded(a: Args): Promise<void> {
     amountWei: a.amount,
   });
   const submitted = await sendTransaction({ account: a.account, transaction });
+  a.onProgress?.({ step: "approval_pending", status: "done", txHash: submitted.transactionHash });
   const receipt = await waitForReceipt({
     client: a.twClient,
     chain: a.twChain,
     transactionHash: submitted.transactionHash,
   });
   if (receipt.status !== "success") {
+    a.onProgress?.({
+      step: "approval_confirmed",
+      status: "failed",
+      txHash: submitted.transactionHash,
+      errorMessage: t("errors.approveReverted"),
+    });
     throw new Error(t("errors.approveReverted"));
   }
+  a.onProgress?.({ step: "approval_confirmed", status: "done", txHash: submitted.transactionHash });
 }

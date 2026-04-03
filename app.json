@@ -33,7 +33,20 @@
     },
     "plugins": [
       "expo-router",
-      "@sentry/react-native"
+      "@sentry/react-native",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 26
+          }
+        }
+      ],
+      "expo-image",
+      "expo-localization",
+      "expo-secure-store",
+      "expo-web-browser",
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true

@@ -5,6 +5,7 @@ import * as LocalAuth from "expo-local-authentication";
 import Constants from "expo-constants";
 import { Feather } from "@expo/vector-icons";
 import { useActiveAccount, useActiveWallet, useDisconnect } from "thirdweb/react-native";
+import { useEffect } from "react";
 
 import { ConnectWalletButton } from "@/components/connect-wallet-button";
 import { WalletMenuHeader } from "@/components/wallet-menu-header";
@@ -12,14 +13,32 @@ import { TopVioletGradient } from "@/components/top-violet-gradient";
 import { BundlesButton } from "@/components/ui";
 
 import { truncateAddress } from "@/lib/format";
+import { ONRAMP_FIAT_OPTIONS } from "@/lib/fiat-onramp-currencies";
+import { resolveEffectiveFiatCurrency, resolveUserCountryCode } from "@/lib/fiat-country-capabilities";
 import { t } from "@/lib/i18n";
 import { cardShadow, pageVioletBg } from "@/lib/ui-shell";
+import { useFiatPreferencesStore } from "@/store/fiat-preferences-store";
 
 export function SettingsScreen() {
   const router = useRouter();
   const account = useActiveAccount();
   const wallet = useActiveWallet();
   const { disconnect } = useDisconnect();
+  const preferredFiatCurrency = useFiatPreferencesStore((s) => s.preferredFiatCurrency);
+  const setPreferredFiatCurrency = useFiatPreferencesStore((s) => s.setPreferredFiatCurrency);
+  const countryCode = resolveUserCountryCode();
+  const fiatResolution = resolveEffectiveFiatCurrency({
+    countryCode,
+    userPreference: preferredFiatCurrency,
+  });
+  const supportedFiatOptions = ONRAMP_FIAT_OPTIONS.filter((o) =>
+    fiatResolution.capabilities.supportedFiatCurrencies.includes(o.code),
+  );
+  useEffect(() => {
+    if (preferredFiatCurrency !== fiatResolution.effectiveFiatCurrency) {
+      setPreferredFiatCurrency(fiatResolution.effectiveFiatCurrency);
+    }
+  }, [fiatResolution.effectiveFiatCurrency, preferredFiatCurrency, setPreferredFiatCurrency]);
 
   const onCopy = async () => {
     if (account?.address) await Clipboard.setStringAsync(account.address);
@@ -68,6 +87,43 @@ export function SettingsScreen() {
             <Text className="text-bundle-text font-medium">{t("settings.exportPrivateKey")}</Text>
             <Text className="text-bundle-muted text-sm mt-1">{t("settings.exportPrivateKeyHint")}</Text>
           </Pressable>
+
+          <View className="mt-4 rounded-[12px] border border-[#E5E5E5] bg-[#F7F8FA] p-3">
+            <Text className="text-bundle-text font-medium mb-2">{t("settings.fiatCurrencyTitle")}</Text>
+            <Text className="text-bundle-muted text-sm mb-2">
+              {t("settings.fiatCurrencyCountryHint").replace(
+                "{country}",
+                fiatResolution.capabilities.countryCode,
+              )}
+            </Text>
+            <View className="flex-row flex-wrap gap-2">
+              {supportedFiatOptions.map((o) => (
+                <Pressable
+                  key={o.code}
+                  disabled={supportedFiatOptions.length === 1}
+                  onPress={() => setPreferredFiatCurrency(o.code)}
+                  className={`px-3 py-2 rounded-md border ${
+                    fiatResolution.effectiveFiatCurrency === o.code
+                      ? "border-bundle-link bg-bundle-card"
+                      : "border-bundle-border-subtle bg-white"
+                  }`}
+                >
+                  <Text
+                    className={
+                      fiatResolution.effectiveFiatCurrency === o.code
+                        ? "text-bundle-link font-medium"
+                        : "text-bundle-text"
+                    }
+                  >
+                    {o.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+            {supportedFiatOptions.length === 1 ? (
+              <Text className="text-bundle-muted text-xs mt-2">{t("settings.fiatCurrencyLocked")}</Text>
+            ) : null}
+          </View>
 
           <BundlesButton
             variant="primary"

@@ -1,4 +1,3 @@
-import Constants from "expo-constants";
 import type { ThirdwebClient } from "thirdweb";
 import { NATIVE_TOKEN_ADDRESS } from "thirdweb";
 import { Onramp } from "thirdweb/bridge";
@@ -10,6 +9,10 @@ import {
   coingeckoVsForFiat,
   type OnRampFiatCurrencyCode,
 } from "@/lib/fiat-onramp-currencies";
+import {
+  isFiatCurrencySupportedForCountry,
+  resolveUserCountryCode,
+} from "@/lib/fiat-country-capabilities";
 import type { SupportedChainId } from "@/lib/chains";
 import { isOnRampEnabledChain } from "@/lib/chains";
 import { t } from "@/lib/i18n";
@@ -33,30 +36,6 @@ export type FiatOnrampQuote = {
  * 1) `EXPO_PUBLIC_ONRAMP_COUNTRY` if defined (example: `FR`)
  * 2) locale region from browser/Intl (`fr-FR` -> `FR`)
  */
-function resolveOnRampCountryCode(): string | undefined {
-  const fromEnv =
-    process.env.EXPO_PUBLIC_ONRAMP_COUNTRY?.trim() ||
-    (
-      Constants.expoConfig?.extra as { EXPO_PUBLIC_ONRAMP_COUNTRY?: string } | undefined
-    )?.EXPO_PUBLIC_ONRAMP_COUNTRY?.trim();
-  if (fromEnv && /^[a-zA-Z]{2}$/.test(fromEnv)) {
-    return fromEnv.toUpperCase();
-  }
-
-  if (typeof navigator !== "undefined" && typeof navigator.language === "string") {
-    const m = navigator.language.match(/-([a-zA-Z]{2})$/);
-    if (m?.[1]) return m[1].toUpperCase();
-  }
-  try {
-    const locale = Intl.DateTimeFormat().resolvedOptions().locale ?? "";
-    const m = locale.match(/-([a-zA-Z]{2})$/);
-    if (m?.[1]) return m[1].toUpperCase();
-  } catch {
-    /* ignore */
-  }
-  return undefined;
-}
-
 function parsePositiveFiatAmount(raw: string | number): number {
   const s = typeof raw === "number" ? String(raw) : String(raw).trim();
   const n = Number.parseFloat(s.replace(",", "."));
@@ -84,7 +63,7 @@ async function transakPrepareFiatQuote(args: {
   fromCurrencySymbol: OnRampFiatCurrencyCode;
 }): Promise<FiatOnrampQuote> {
   const amountWei = toUnits(args.toAmountEthHuman, 18);
-  const country = resolveOnRampCountryCode();
+  const country = resolveUserCountryCode();
 
   const prepared = await Onramp.prepare({
     client: args.client,
@@ -121,6 +100,14 @@ export async function quoteFiatToEthOnramp(args: {
 }): Promise<FiatOnrampQuote> {
   if (!isOnRampEnabledChain(args.chainId)) {
     throw new Error(t("errors.onRampUnavailable"));
+  }
+  const country = resolveUserCountryCode();
+  if (!isFiatCurrencySupportedForCountry(country, args.fiatCurrency)) {
+    throw new Error(
+      t("errors.unsupportedCurrencyForCountry")
+        .replace("{currency}", args.fiatCurrency)
+        .replace("{country}", country ?? "unknown"),
+    );
   }
   const walletAddress = getAddress(args.walletAddress as Address);
   const fiat = parsePositiveFiatAmount(args.fiatAmount);

@@ -14,13 +14,14 @@ import {
   usePriceHistory,
   useTokenStatistics,
 } from "@/features/bundles/bundles-queries";
-import { formatPct, formatUsd, formatWeightPercent } from "@/lib/format";
+import { formatFiatAmount, formatPct, formatWeightPercent } from "@/lib/format";
 import { t } from "@/lib/i18n";
 import { bundleIconUrl } from "@/lib/media";
 import { uiTokens } from "@/lib/ui-tokens";
 import { cardShadow, pageVioletBg } from "@/lib/ui-shell";
 import { useNetworkStore } from "@/store/network-store";
 import type { HistoryTimeframe } from "@/services/bundles-ws/token-api";
+import { useUsdToFiatRate } from "@/hooks/use-fiat-display";
 
 function normalizeWeightWei(value: bigint | number): bigint {
   if (typeof value === "bigint") return value;
@@ -35,6 +36,7 @@ export default function BundleDetailRoute() {
   const detailQ = useBundleDetail(typeof address === "string" ? address : undefined, activeChainId);
   const statsQ = useTokenStatistics(typeof address === "string" ? address : undefined, activeChainId);
   const [timeframe, setTimeframe] = useState<HistoryTimeframe>("week");
+  const { fiatCurrency, usdToFiatRate } = useUsdToFiatRate();
   const histQ = usePriceHistory(
     typeof address === "string" ? address : undefined,
     timeframe,
@@ -62,7 +64,9 @@ export default function BundleDetailRoute() {
   }
 
   const totalSupplyUnits = Number(bundle.totalSupply) / 10 ** bundle.decimals;
+  const priceFiat = price !== undefined ? price * usdToFiatRate : undefined;
   const mcap = price !== undefined ? price * totalSupplyUnits : undefined;
+  const mcapFiat = mcap !== undefined ? mcap * usdToFiatRate : undefined;
   const totalWeightWei = bundle.assets.reduce((sum, a) => sum + normalizeWeightWei(a.startWeight), 0n);
 
   return (
@@ -99,7 +103,7 @@ export default function BundleDetailRoute() {
 
             <View className="mb-2">
               <Text className="text-2xl font-semibold text-bundle-text">
-                {price !== undefined ? formatUsd(price) : "—"}
+                {priceFiat !== undefined ? formatFiatAmount(priceFiat, fiatCurrency) : "—"}
               </Text>
               <Text style={{ color: positive ? uiTokens.colors.success : uiTokens.colors.danger }}>
                 {varText} 24h
@@ -117,7 +121,7 @@ export default function BundleDetailRoute() {
           <View className="rounded-[20px] bg-white p-4 mb-4" style={cardShadow}>
             <Text className="text-[20px] leading-[24px] font-semibold text-[#181818] mb-3">{t("bundleDetail.metrics")}</Text>
             <Text className="text-bundle-muted text-sm font-mono mb-1">
-              {t("bundleDetail.marketCap")}: {mcap !== undefined ? formatUsd(mcap) : "—"}
+              {t("bundleDetail.marketCap")}: {mcapFiat !== undefined ? formatFiatAmount(mcapFiat, fiatCurrency) : "—"}
             </Text>
             <Text className="text-bundle-muted text-sm mb-1">{t("bundleDetail.mintBurnFee")}: {bundle.mintBurnFee}</Text>
             <Text className="text-bundle-muted text-sm mb-1">{t("bundleDetail.swapFee")}: {bundle.swapFee}</Text>

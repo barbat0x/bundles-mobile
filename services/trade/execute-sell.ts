@@ -13,6 +13,7 @@ import { sellBundle } from "@/services/universal-router-client";
 
 import { approveIfNeeded } from "./approve-if-needed";
 import { t } from "@/lib/i18n";
+import type { SwapExecutionProgressEvent } from "@/features/trade/swap-execution-state";
 
 export type SellArgs = {
   publicClient: PublicClient;
@@ -23,6 +24,7 @@ export type SellArgs = {
   bundleAddress: Address;
   bundleAmountIn: bigint;
   slippageBps?: bigint;
+  onProgress?: (event: SwapExecutionProgressEvent) => void;
 };
 
 export async function executeSell(a: SellArgs): Promise<{ transactionHash: string }> {
@@ -35,6 +37,7 @@ export async function executeSell(a: SellArgs): Promise<{ transactionHash: strin
     account: a.account,
     token: a.bundleAddress,
     amount: a.bundleAmountIn,
+    onProgress: a.onProgress,
   });
 
   const quote = await sellBundle(a.publicClient, a.bundleAddress, a.bundleAmountIn, {
@@ -60,10 +63,12 @@ export async function executeSell(a: SellArgs): Promise<{ transactionHash: strin
     }),
   });
 
+  a.onProgress?.({ step: "swap_pending", status: "pending" });
   const submitted = await sendTransaction({
     account: a.account,
     transaction,
   });
+  a.onProgress?.({ step: "swap_submitted", status: "done", txHash: submitted.transactionHash });
 
   const receipt = await waitForReceipt({
     client: a.twClient,
@@ -72,8 +77,15 @@ export async function executeSell(a: SellArgs): Promise<{ transactionHash: strin
   });
 
   if (receipt.status !== "success") {
+    a.onProgress?.({
+      step: "swap_confirmed",
+      status: "failed",
+      txHash: submitted.transactionHash,
+      errorMessage: t("errors.sellTransactionReverted"),
+    });
     throw new Error(t("errors.sellTransactionReverted"));
   }
+  a.onProgress?.({ step: "swap_confirmed", status: "done", txHash: submitted.transactionHash });
 
   return { transactionHash: submitted.transactionHash };
 }
