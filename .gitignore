@@ -78,9 +78,13 @@ pnpm-debug.log*
 Thumbs.db
 
 # -----------------------------------------------------------------------------
-# Local-only docs (not pushed)
+# Markdown (GitHub): only root README.md + docs/TROUBLESHOOTING.md are tracked.
+# Everything else (*.md) is local (Cursor / personal). Override: git add -f path/to/file.md
 # -----------------------------------------------------------------------------
-SECURITY-REVIEW-CHECKLIST.md
-TCO_COMPARATIF.md
-TROUBLESHOOTING.md
-ARCHITECTURE.md
+**/*.md
+!README.md
+!docs/TROUBLESHOOTING.md
+
+*.local.md
+check_elf_alignment.sh
+.gradle-user-home/
