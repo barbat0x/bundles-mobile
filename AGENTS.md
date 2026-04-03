@@ -65,6 +65,24 @@ Refer to `PLAN.md` for full rationale:
 - `expo-secure-store` for sensitive data, `AsyncStorage` for non-secret state only.
 - Network state handling for RPC / on-ramp failures.
 
+## Official documentation & best practices (mandatory)
+
+All changes must align with **authoritative** sources—not forum guesses alone.
+
+| Area | Primary references |
+|------|---------------------|
+| **Expo / RN workflow** | [Expo docs](https://docs.expo.dev/) (SDK version pinned in `package.json`), [React Native docs](https://reactnative.dev/docs/getting-started) |
+| **Android / Gradle** | [Android Developers](https://developer.android.com/), [Gradle User Manual](https://docs.gradle.org/current/userguide/userguide.html) |
+| **EAS** | [EAS Build / Submit](https://docs.expo.dev/build/introduction/) |
+| **thirdweb** | [thirdweb TypeScript v5](https://portal.thirdweb.com/typescript/v5) |
+| **Patches to `node_modules`** | Prefer upstream fix or upgrade; if blocked, use [`patch-package`](https://github.com/ds300/patch-package) with **`patches/*.patch` committed**, and document in `docs/TROUBLESHOOTING.md` with **symptom → root cause → official rationale** (e.g. Gradle deprecations from Gradle’s own upgrading guides) |
+
+**Rules for agents & contributors**
+
+1. Prefer behavior described in **official docs** over ad-hoc patterns from blogs/Stack Overflow unless the latter **cites** the same primary source.
+2. When fixing toolchain issues (Gradle, ADB, emulator, 16 KB), cross-check **Android / Gradle / Expo** documentation and record the **verification command** (see `docs/TROUBLESHOOTING.md`).
+3. New dependencies must be **justified** (see *Maximum Simplicity* above) and pinned consistently with Expo’s recommendations (`npx expo install` where applicable).
+
 ## Critical Security Rules
 
 1. ONLY interact with whitelisted contract addresses (`lib/contracts.ts`).
